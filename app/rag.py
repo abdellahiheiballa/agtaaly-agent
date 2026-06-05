@@ -1,59 +1,49 @@
 from pathlib import Path
+import hashlib
+import math
+import re
 from typing import Dict, Iterable, List
 
 import chromadb
-from langchain_openai.embeddings import OpenAIEmbeddings
 
 from app.config import settings
 
 
-# Adapter to make LangChain OpenAIEmbeddings compatible with Chroma's embedding
-# function API. Chroma may call `embed_query(input=...)` or `__call__(input=...)`,
-# so the adapter supports both positional and keyword arguments.
-class LangchainEmbeddingAdapter:
-    def __init__(self, lc_embeddings: OpenAIEmbeddings):
-        self.lc = lc_embeddings
-
-    def embed_documents(self, documents, **_kwargs):
-        return list(self.lc.embed_documents(list(documents)))
-
-    def embed_query(self, query=None, **kwargs):
-        # Accept either positional or keyword 'input' parameter
-        if query is None and "input" in kwargs:
-            query = kwargs.get("input")
-        # Chroma may pass a single string or a list of strings here.
-        if isinstance(query, (list, tuple)):
-            # Use embed_documents for batch queries and return list of embeddings
-            return list(self.lc.embed_documents(list(query)))
-        return list(self.lc.embed_query(query))
-
-    def __call__(self, input):
-        # Chroma passes either a sequence of texts or ('images', uris)
-        if isinstance(input, tuple) and len(input) == 2 and input[0] == "images":
-            # images handling not supported here
-            raise ValueError("Image embeddings not supported by Langchain adapter")
-        return [list(e) for e in self.lc.embed_documents(list(input))]
-
-
-class MockEmbeddingFunction:
+class LocalEmbeddingFunction:
     def __init__(self, dimension: int):
         self.dimension = dimension
 
-    def _embedding(self) -> List[float]:
-        return [0.0] * self.dimension
+    def _tokens(self, text: str) -> List[str]:
+        return re.findall(r"[A-Za-z0-9_À-ÿ\u0600-\u06FF]+", text.lower())
+
+    def _embedding(self, text: str) -> List[float]:
+        vector = [0.0] * self.dimension
+        tokens = self._tokens(text)
+        if not tokens:
+            return vector
+
+        for token in tokens:
+            digest = hashlib.sha256(token.encode("utf-8")).digest()
+            index = int.from_bytes(digest[:8], "big") % self.dimension
+            vector[index] += 1.0
+
+        norm = math.sqrt(sum(value * value for value in vector))
+        if norm:
+            vector = [value / norm for value in vector]
+        return vector
 
     def embed_documents(self, documents, **_kwargs):
-        return [self._embedding() for _ in documents]
+        return [self._embedding(document) for document in documents]
 
     def embed_query(self, query=None, **kwargs):
         if query is None and "input" in kwargs:
             query = kwargs.get("input")
         if isinstance(query, (list, tuple)):
-            return [self._embedding() for _ in query]
-        return self._embedding()
+            return [self._embedding(item) for item in query]
+        return self._embedding(query or "")
 
     def __call__(self, input):
-        return [self._embedding() for _ in input]
+        return [self._embedding(item) for item in input]
 
 
 def _split_text(text: str, chunk_size: int = 800, chunk_overlap: int = 100) -> Iterable[str]:
@@ -66,7 +56,7 @@ def _split_text(text: str, chunk_size: int = 800, chunk_overlap: int = 100) -> I
             yield chunk
         if end == text_length:
             break
-        start = max(end - chunk_overlap, end)
+        start = max(end - chunk_overlap, start + 1)
 
 
 def _get_client() -> chromadb.api.ClientAPI:
@@ -76,11 +66,7 @@ def _get_client() -> chromadb.api.ClientAPI:
 
 def _get_collection() -> chromadb.api.models.Collection.Collection:
     client = _get_client()
-    if settings.mock_ingest:
-        embedding_function = MockEmbeddingFunction(settings.mock_embedding_dim)
-    else:
-        embeddings = OpenAIEmbeddings(model=settings.openai_embedding_model)
-        embedding_function = LangchainEmbeddingAdapter(embeddings)
+    embedding_function = LocalEmbeddingFunction(settings.mock_embedding_dim)
     return client.create_collection(
         name="agtaaly",
         embedding_function=embedding_function,
@@ -94,6 +80,15 @@ def has_documents() -> bool:
         return collection.count() > 0
     except Exception:
         return False
+
+
+def _reset_collection() -> chromadb.api.models.Collection.Collection:
+    client = _get_client()
+    try:
+        client.delete_collection(name="agtaaly")
+    except Exception:
+        pass
+    return _get_collection()
 
 
 def load_knowledge_chunks() -> List[Dict[str, object]]:
@@ -116,26 +111,25 @@ def load_knowledge_chunks() -> List[Dict[str, object]]:
     return chunks
 
 
+def load_bot_instructions() -> str:
+    instructions_path = Path(__file__).resolve().parents[1] / "knowledge" / "bot_instructions.txt"
+    if not instructions_path.exists():
+        return ""
+    return instructions_path.read_text(encoding="utf-8").strip()
+
+
 def ingest_knowledge() -> None:
     chunks = load_knowledge_chunks()
     if not chunks:
         raise FileNotFoundError(
             "Knowledge base files not found or empty in the knowledge/ directory"
         )
-    collection = _get_collection()
-    try:
-        # If the collection is empty, some Chroma versions raise an error
-        # when calling delete() without filters. Ignore that case.
-        collection.delete()
-    except Exception:
-        pass
+    collection = _reset_collection()
     add_kwargs = {
         "ids": [chunk["id"] for chunk in chunks],
         "documents": [chunk["text"] for chunk in chunks],
         "metadatas": [chunk["metadata"] for chunk in chunks],
     }
-    if settings.mock_ingest:
-        add_kwargs["embeddings"] = [[0.0] * settings.mock_embedding_dim for _ in chunks]
     collection.add(**add_kwargs)
 
 
@@ -145,10 +139,7 @@ def query_knowledge(question: str, k: int | None = None) -> List[Dict[str, objec
         "n_results": k or settings.top_k_retrieval,
         "include": ["metadatas", "documents"],
     }
-    if settings.mock_ingest:
-        query_kwargs["query_embeddings"] = [[0.0] * settings.mock_embedding_dim]
-    else:
-        query_kwargs["query_texts"] = [question]
+    query_kwargs["query_texts"] = [question]
     result = collection.query(**query_kwargs)
     documents = []
     for metadata, document in zip(result["metadatas"][0], result["documents"][0]):

@@ -15,11 +15,11 @@ class Settings(BaseSettings):
     top_k_retrieval: int = 4
     whatsapp_api_version: str = "v21.0"
     processed_events_db: Path = Path("./data/processed_events.db")
-    # When True, skip calling OpenAI and add mock embeddings to Chroma for testing
+    # When True, skip the OpenAI chat call and return a local test reply.
     mock_ingest: bool = False
     # When True, skip WhatsApp Graph API calls and log outbound messages locally
     mock_whatsapp_send: bool = False
-    # Dimension to use for generated mock embeddings when `mock_ingest` is True
+    # Dimension for the local deterministic retrieval embeddings.
     mock_embedding_dim: int = 1536
 
     class Config:

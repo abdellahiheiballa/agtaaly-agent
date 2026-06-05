@@ -2,6 +2,10 @@ import httpx
 from app.config import settings
 
 
+class WhatsAppSendError(RuntimeError):
+    pass
+
+
 WHATSAPP_BASE_URL = (
     f"https://graph.facebook.com/{settings.whatsapp_api_version}/"
     f"{settings.whatsapp_phone_number_id}"
@@ -35,7 +39,12 @@ async def send_text_message(phone_number: str, message: str) -> dict:
     }
     async with httpx.AsyncClient(timeout=15) as client:
         response = await client.post(f"{WHATSAPP_BASE_URL}/messages", json=payload, headers=headers)
-        response.raise_for_status()
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            raise WhatsAppSendError(
+                f"WhatsApp send failed with {response.status_code}: {response.text}"
+            ) from exc
         return response.json()
 
 

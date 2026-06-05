@@ -4,8 +4,8 @@
 
 - `app/main.py`: FastAPI service that handles WhatsApp webhook verification, message ingestion, duplicate event filtering, and background replies.
 - `app/config.py`: Settings for OpenAI, WhatsApp Cloud API, and ChromaDB persistence.
-- `app/rag.py`: Responsible for loading knowledge content from plaintext files, embedding text, and storing/retrieving it in ChromaDB.
-- `app/agent.py`: Uses LangChain with OpenAI embeddings and GPT-4o to answer user questions using retrieval-augmented generation.
+- `app/rag.py`: Loads plaintext knowledge files, creates local deterministic embeddings, and stores/retrieves chunks in ChromaDB.
+- `app/agent.py`: Combines the Agtaaly operator instructions, retrieved knowledge chunks, and the user message to answer in a WhatsApp support style.
 - `app/whatsapp.py`: Parses incoming WhatsApp webhook payloads and sends outbound WhatsApp text messages using the WhatsApp Cloud API.
 - `scripts/ingest.py`: A deployable script to create or refresh the local ChromaDB knowledge base.
 - `knowledge/`: Place `.txt` knowledge files here for ingestion.
@@ -24,11 +24,11 @@
 5. Start the API:
    - `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
 
-If the OpenAI API key is missing at startup, the service will still launch, but knowledge ingestion and response generation will require `OPENAI_API_KEY` to be set.
+Knowledge ingestion does not require OpenAI credits. OpenAI is used for the polished chat response; if that call fails, the service still returns a short Agtaaly-style fallback from the retrieved context.
 
-### Mock ingestion mode
+### Mock mode
 
-Set `MOCK_INGEST=true` to skip OpenAI embeddings and write zero-vector mock embeddings into ChromaDB. In this mode, incoming WhatsApp messages receive a simple mock reply instead of calling the OpenAI chat model.
+Set `MOCK_INGEST=true` to skip the OpenAI chat model and return a simple local test reply. Retrieval still uses the local ChromaDB knowledge index.
 
 Set `MOCK_WHATSAPP_SEND=true` to skip WhatsApp Graph API calls and print outbound messages locally. Use both mock flags together to test that the webhook receives messages and the bot can produce replies without OpenAI or WhatsApp credentials.
 
@@ -88,5 +88,6 @@ When `MOCK_INGEST=true`, `/ingest` returns `"mock_ingest": true`.
 
 ## Notes
 
-- This is a Phase 1 proof-of-concept.
-- Replace the placeholder knowledge content in `knowledge/` with actual AGTAALY bus route, ticketing, and customer service information.
+- Edit `knowledge/agtaaly_info.txt` for Agtaaly facts.
+- Edit `knowledge/bot_instructions.txt` for tone, language, and operator behavior.
+- Run `python -m scripts.ingest` after changing knowledge files.

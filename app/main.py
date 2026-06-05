@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 from app.agent import answer_query
 from app.config import settings
 from app.rag import has_documents, ingest_knowledge
-from app.whatsapp import parse_whatsapp_message, send_text_message
+from app.whatsapp import WhatsAppSendError, parse_whatsapp_message, send_text_message
 
 
 app = FastAPI(
@@ -152,6 +152,8 @@ async def _handle_incoming_message(event: dict) -> None:
         answer = answer_query(event["text"])
         await send_text_message(event["phone_number"], answer)
         _log_out(event["phone_number"], answer)
+    except WhatsAppSendError as exc:
+        _log_error("Failed to send WhatsApp message", exc)
     except Exception as exc:
         # If answering fails (OpenAI quota, ingestion error, etc.), send a
         # short fallback message so the sender can verify connectivity.
