@@ -40,27 +40,39 @@ async def send_text_message(phone_number: str, message: str) -> dict:
 
 
 def parse_whatsapp_message(payload: dict) -> dict | None:
-    entry = payload.get("entry")
-    if not entry or not isinstance(entry, list):
+    entries = payload.get("entry")
+    if not entries or not isinstance(entries, list):
         return None
-    change = entry[0].get("changes")
-    if not change or not isinstance(change, list):
-        return None
-    value = change[0].get("value", {})
-    messages = value.get("messages") or []
-    if not messages:
-        return None
-    message = messages[0]
-    sender = message.get("from")
-    msg_id = message.get("id")
-    text = None
-    if message.get("type") == "text":
-        text = message.get("text", {}).get("body")
-    if not sender or not msg_id or not text:
-        return None
-    return {
-        "phone_number": sender,
-        "message_id": msg_id,
-        "text": text,
-        "timestamp": message.get("timestamp"),
-    }
+
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        changes = entry.get("changes")
+        if not changes or not isinstance(changes, list):
+            continue
+        for change in changes:
+            if not isinstance(change, dict):
+                continue
+            value = change.get("value", {})
+            if not isinstance(value, dict):
+                continue
+            messages = value.get("messages") or []
+            if not messages or not isinstance(messages, list):
+                continue
+            for message in messages:
+                if not isinstance(message, dict):
+                    continue
+                sender = message.get("from")
+                msg_id = message.get("id")
+                text = None
+                if message.get("type") == "text":
+                    text = (message.get("text") or {}).get("body")
+                if sender and msg_id and text:
+                    return {
+                        "phone_number": sender,
+                        "message_id": msg_id,
+                        "text": text,
+                        "timestamp": message.get("timestamp"),
+                    }
+
+    return None

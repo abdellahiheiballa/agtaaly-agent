@@ -1,13 +1,139 @@
-AGTAALY Knowledge Base Placeholder
+AGTAALY Knowledge Base 
+L’adeesse:Sur la route de Nouadhibou, près de l'épicerie yestabchiroun  les numéro de telephone sont le suivant.34342126,36463831,46473831
 
-This file is the knowledge base for the AGTAALY WhatsApp assistant.
-Add helpful content here, such as:
-- bus schedules and seat availability
-- ticket booking procedures
-- reservation policies
-- accepted payment methods
-- agency contact details
-- city and route information in Mauritania
-- frequently asked questions for passengers
+Site: agtaalyvite.com
+Sous le NIF 01375179
+Numéro Registre de 123131/3939
+Nom commercial : AGTAALY-SNARL
+Date de constitution :
+21/09/2023
 
-Each paragraph should be a short, factual statement. The ingestion script will split this content into retrievable chunks.
+AGTAALY- SARL  
+
+شركة ريادية في مجال النقل البري تقدم
+  حل تقني شامل لرقمنة القطاع النقل ، من خلال تطبيقين مترابطين:
+1. تطبيق المسافرين (B2C):
+منصة للمقارنة والحجز الفوري عن بعد (سعر، وقت، مقاعد) للمسافرين بين المدن، لضمان رحلة سريعة وآمنة بضغطة زر.
+2. تطبيق وكالات النقل (B2B):
+نظام إدارة شامل للوكالات؛ يتيح عرض المقاعد، إدارة الطرود، ومتابعة شؤون الموظفين والرواتب، مع ميزة الإدارة المركزية للفروع لرفع كفاءة العمليات وتعزيز الرقابة.
+
+Nouakchott, le 15/12/2025
+Présentation du projet :
+Le projet consiste en une application de réservation destinée aux
+voyageurs du transport interurbain. Elle permet aux utilisateurs de
+comparer les offres des agences de voyage disponibles, de choisir celle qui
+convient en fonction du temps et du prix, et d'effectuer la réservation à
+distance de manière simple et rapide.
+Cible:
+Nous ciblons tous les voyageurs qui utilisent les transports interurbains
+en mauritanie.
+AGTAALY-SARL
+Sous le NIF:01375179
+Siége social:NOT MD E N 0139T
+Nouakchott-Mauritanie
+Téléphone 36463831-34342126
+site:www.agtaalyvite.com
+Email:agtaalyvite@gmail.com
+
+Présentation du projet :
+
+Le projet consiste en une plateforme numérique composée de deux applications principales :
+
+1. Application destinée aux voyageurs : Elle permet aux utilisateurs de comparer les offres des agences de voyage disponibles, de choisir en fonction du temps et du prix qui leur conviennent, et d'effectuer la réservation à distance de manière simple et rapide, ce qui permet de gagner du temps, de l'argent et de l'effort.
+
+2. Application destinée aux agences de transport: Elle permet aux agences d'afficher les sieges disponible et, de gérer les colis, gérer les comptes de leurs employés, les salaires des employés et de gérer les succursales de manière centralisée, ce qui améliore l'efficacité des opérations et renforce la sécurité et la rapidité.
+
+بنكيليBankily mobile payment 
+PAR BPM
+التاجر معلومات
+Identification du commerçant
+Nom du commerçant: AGTAALY SAR
+Code Commerçant : 023140
+الموريتاني الشعبي البنك
+BANQUE POPULAIRE BPM
+DE MAURITANIE
+: التاجر اسم
+: التاجر رمز
+
+
+Route de Nouadhibou près des bains du Nil
+La possibilité de recevoir et de traiter de nouvelles réservations
+et de gérer les listes de voyageurs.
+Suivi étroit de l'activité de billetterie et de réservation, et analyse des
+données financières dans toutes les agences.
+Le propriétaire ou le superviseur de l'agence peut avoir la pleine
+gestion de son agence, ce qui signifie
+Contrôle total de la gestion (inscription, annulation, modification) des agences,
+des itinéraires et des voyages
+ّ
+Les clients peuvent réserver leurs billets de voyage en ligne, de n'importe
+où et à tout moment, en recherchant leur agence de voyages
+préférée.
+Prévoit des dispositions pour les employés de l'agence
+Suivi de leurs colis expédiés par cette agence
+Envoi d'un colis avec ses détails à d'autres agences et réception
+d'une liste de colis avec leurs détails provenant d'autres agences
+Elle offre une interface conviviale pour le suivi des messages, des
+réservations et des notifications de l'agence. ADRESSE NON MD 0139TVZ
+Ajoutez de nouvelles réservations directement depuis cette application.
+00 222 34342126
+Chez « Aktaali Fit », nous nous engageons à
+aider les agences de transport à tirer le meilleur
+parti des technologies modernes, ce qui
+améliorera vos opérations et l'expérience de vos clients.
+Nous sommes convaincus qu'un partenariat avec nous
+ouvrira de nouvelles perspectives d'innovation et de réussite
+dans le secteur des transports terrestres. Nous serions ravis
+d'échanger plus en détail avec vous sur cette proposition et
+d'entamer ensemble notre transformation numérique.
+www.agtaalyvite.com
+Application d'exploitation interne
+application de gestion d'agence de transport
+Application de réservation intelligente
+Machine Translated by Google
+... Si tu ne m'écoutes pas,
+ça suffit, coupe les ponts.
+Étapes de mise en œuvre Avantages spéciaux pour les agences partenaires
+Avantages supplémentaires
+--------
+détaillés et identifier les lacunes des processus actuels ;
+concevez un plan de mise en œuvre personnalisé qui garantit une
+intégration harmonieuse des applications à l’infrastructure de votre organisme.
+Solution numérique et moderne, spécialement
+conçue pour les voyageurs et le fret afin d'optimiser la
+rentabilité des agences. Assistance technique continue : une
+équipe dédiée assure la maintenance et les mises à jour de
+l'application, ainsi
+que la formation de votre personnel. Personnalisation sur
+demande : possibilité d'ajouter de nouvelles fonctionnalités ou des
+modifications pour répondre à vos besoins spécifiques,
+moderniser votre activité et en accroître lMise en œuvre et
+formation : Installation et configuration des systèmes et applications pour
+répondre à vos
+besoins ; formation complète de vos équipes pour garantir une
+utilisation efficace et flexible des nouvelles technologies.
+Pour augmenter
+Modèle de tarification basé
+sur l'investissement et le retour sur investissement : Nous proposons
+des plans tarifaires flexibles adaptés à la taille et au
+type de services requis. Retour sur investissement : Nous
+démontrons comment l'utilisation de ces technologies permettra
+d'accroître les revenus et de réduire les coûts à long terme.
+Réaliser des évaluations périodiques des performances du système
+en recueillant les commentaires des utilisateurs ;
+fournir des mises à jour, des améliorations et des correctifs réguliers afin
+d'assurer un développement et une innovation continus dans les services fournis.
+Suivi continu des mouvements de marchandises et de passagers
+dans toutes les agences, à tout moment et en tout lieu ; efficacité
+opérationnelle accrue et réduction des erreurs humaines grâce
+à l’automatisation des processus ;
+communication améliorée entre les agences via un système
+d’information et de
+messagerie avancé ; suppression du besoin de bureaux et
+d’ordinateurs fixes grâce à un environnement de travail mobile à
+coûts logistiques minimaux (applications
+pour smartphones) ; expérience client considérablement
+améliorée et accès facilité
+à vos services ; et élargissement de votre clientèle grâce à
+une offre de services innovants répondant aux besoins des voysurveillance et amélioration continues
+Machine Translated by Google

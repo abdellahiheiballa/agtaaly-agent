@@ -72,6 +72,12 @@ def _log_duplicate(message_id: str) -> None:
     print(f"[DUP] DUPLICATE skipped: {message_id}", flush=True)
 
 
+def _log_ignored_webhook(payload: dict) -> None:
+    entry_count = len(payload.get("entry") or []) if isinstance(payload.get("entry"), list) else 0
+    keys = sorted(payload.keys())
+    print(f"[IGN] webhook payload ignored: entries={entry_count}, keys={keys}", flush=True)
+
+
 def _log_error(message: str, exc: Exception) -> None:
     print(f"[ERR] {message}: {exc}", flush=True)
     print(traceback.format_exc(), flush=True)
@@ -128,6 +134,7 @@ async def verify_webhook(
 async def receive_webhook(payload: dict, background_tasks: BackgroundTasks) -> JSONResponse:
     event = parse_whatsapp_message(payload)
     if not event:
+        _log_ignored_webhook(payload)
         return JSONResponse({"status": "ignored"}, status_code=200)
 
     _log_in(event)
