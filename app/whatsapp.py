@@ -62,4 +62,5 @@ def parse_whatsapp_message(payload: dict) -> dict | None:
         "phone_number": sender,
         "message_id": msg_id,
         "text": text,
+        "timestamp": message.get("timestamp"),
     }

@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o"
     openai_embedding_model: str = "text-embedding-3-small"
     top_k_retrieval: int = 4
-    whatsapp_api_version: str = "v17.0"
+    whatsapp_api_version: str = "v21.0"
     processed_events_db: Path = Path("./data/processed_events.db")
     # When True, skip calling OpenAI and add mock embeddings to Chroma for testing
     mock_ingest: bool = False
