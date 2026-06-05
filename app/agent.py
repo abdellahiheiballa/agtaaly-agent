@@ -1,10 +1,20 @@
-import re
-
-from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_openai import ChatOpenAI
 
 from app.config import settings
-from app.rag import load_bot_instructions, query_knowledge
+from app.rag import ProviderConfigError, load_bot_instructions, query_knowledge
+
+
+def _normalized_provider(value: str, allowed: set[str], env_name: str) -> str:
+    normalized = value.strip().lower()
+    if normalized not in allowed:
+        allowed_values = ", ".join(sorted(allowed))
+        raise ProviderConfigError(f"{env_name} must be one of: {allowed_values}.")
+    return normalized
+
+
+def _llm_provider() -> str:
+    return _normalized_provider(settings.llm_provider, {"groq", "openai"}, "LLM_PROVIDER")
 
 
 def _build_system_prompt() -> str:
@@ -33,163 +43,42 @@ def _build_context(documents: list) -> str:
     )
 
 
-def _detect_language(text: str) -> str:
-    lowered = text.lower()
-    if re.search(r"[\u0600-\u06FF]", text):
-        return "ar"
-    french_markers = [
-        "bonjour",
-        "salut",
-        "trajet",
-        "voyage",
-        "reserver",
-        "r\u00e9server",
-        "agence",
-        "quand",
-        "demain",
-        "prix",
-    ]
-    if any(marker in lowered for marker in french_markers):
-        return "fr"
-    return "en"
-
-
-def _simple_context_answer(question: str, documents: list) -> str:
-    language = _detect_language(question)
-    lowered = question.lower()
-    context = _build_context(documents)
-    route_markers = [
-        "nouakchott",
-        "nouadhibou",
-        "atar",
-        "rosso",
-        "kaedi",
-        "kiffa",
-        "nema",
-        "zouerate",
-        "selibaby",
-        "to ",
-        "->",
-        "\u2192",
-    ]
-
-    if "agtaaly" in lowered and any(
-        word in lowered for word in ["what", "quoi", "c'est", "\u0634\u0646\u0648", "\u0645\u0627"]
-    ):
-        if language == "fr":
-            return (
-                "Agtaaly facilite les trajets entre les villes :)\n"
-                "Je peux chercher, comparer les prix et reserver pour toi.\n"
-                "Tu veux voyager ou gerer une agence ?"
-            )
-        if language == "ar":
-            return (
-                "تُسهّل Agtaaly السفر بين المدن :)\n"
-                "يمكنني البحث عن الرحلات، مقارنة الأسعار، وإتمام الحجز لك.\n"
-                "هل ترغب في السفر أم في إدارة وكالة؟"
-            )
-        return (
-            "Agtaaly makes intercity travel easier :)\n"
-            "I can search trips, compare prices, and book for you.\n"
-            "Are you traveling or managing an agency?"
-        )
-
-    if any(word in lowered for word in ["seat", "seats", "si\u00e8ge", "places", "\u0645\u0642\u0627\u0639\u062f"]):
-        if language == "fr":
-            return "Bien sur :) C'est pour quel trajet ?"
-        if language == "ar":
-            return "بكل تأكيد :) لأي رحلة تريد تحديث المقاعد؟"
-        return "Sure :) Which trip is it for?"
-
-    if any(
-        word in lowered
-        for word in ["booking", "reservation", "r\u00e9servation", "problem", "probl\u00e8me", "\u0645\u0634\u0643\u0644\u0629"]
-    ):
-        if language == "fr":
-            return "Ah desole pour ca. Dis-moi ce qui ne va pas et je te le corrige."
-        if language == "ar":
-            return "أعتذر عن ذلك. أخبرني بالمشكلة وسأعمل على حلّها لك."
-        return "Ah sorry about that. Tell me what's wrong and I'll fix it for you."
-
-    if any(
-        word in lowered
-        for word in [
-            "trip",
-            "travel",
-            "trajet",
-            "voyager",
-            "route",
-            "\u0633\u0641\u0631",
-            "\u0631\u062d\u0644\u0629",
-        ]
-    ):
-        if language == "fr":
-            return "Parfait :) Tu voyages quand ?"
-        if language == "ar":
-            return "حسنًا :) متى ترغب في السفر؟"
-        return "Got it :) When do you want to travel?"
-
-    if any(marker in lowered for marker in route_markers):
-        if language == "fr":
-            return "Parfait :) Tu voyages quand ?"
-        if language == "ar":
-            return "حسنًا :) متى ترغب في السفر؟"
-        return "Got it :) When do you want to travel?"
-
-    phone_numbers = re.findall(r"\b\d{8}\b", context)
-    if any(
-        word in lowered
-        for word in ["phone", "number", "contact", "telephone", "t\u00e9l\u00e9phone", "\u0631\u0642\u0645"]
-    ):
-        if phone_numbers:
-            numbers = ", ".join(dict.fromkeys(phone_numbers[:3]))
-            if language == "fr":
-                return f"Bien sur :) Tu peux contacter Agtaaly ici : {numbers}"
-            if language == "ar":
-                return f"بكل تأكيد :) أرقام Agtaaly هي: {numbers}"
-            return f"Sure :) You can contact Agtaaly here: {numbers}"
-
-    if language == "fr":
-        return "Je m'en occupe :) Dis-moi juste ce que tu veux faire sur Agtaaly."
-    if language == "ar":
-        return "حسنًا :) أخبرني فقط بما تريد إنجازه على Agtaaly."
-    return "I'll handle it :) Tell me what you want to do on Agtaaly."
-
-
 def create_agent():
-    return init_chat_model(
-        model=settings.openai_model,
-        model_provider="openai",
-        temperature=0.2,
-    )
+    provider = _llm_provider()
+    if provider == "groq":
+        if not settings.groq_api_key:
+            raise ProviderConfigError("GROQ_API_KEY is required when LLM_PROVIDER=groq.")
+        return ChatOpenAI(
+            model=settings.groq_model,
+            api_key=settings.groq_api_key,
+            base_url=settings.groq_base_url,
+            temperature=0.2,
+        )
+    if provider == "openai":
+        if not settings.openai_api_key:
+            raise ProviderConfigError("OPENAI_API_KEY is required when LLM_PROVIDER=openai.")
+        return ChatOpenAI(
+            model=settings.openai_model,
+            api_key=settings.openai_api_key,
+            temperature=0.2,
+        )
+    raise ProviderConfigError(f"Unsupported LLM provider: {provider}")
 
 
 def answer_query(question: str) -> str:
     documents = query_knowledge(question)
-    if settings.mock_ingest:
-        context_hint = _build_context(documents)
-        return (
-            "Mock AGTAALY reply: I received your message and I can use the knowledge base.\n"
-            f"Question: {question}\n"
-            f"Context preview: {context_hint[:220] if context_hint else 'no knowledge context available'}"
-        )
-
-    system_prompt = _build_system_prompt()
     context_text = _build_context(documents)
-    llm = create_agent()
     messages = [
-        SystemMessage(content=system_prompt),
+        SystemMessage(content=_build_system_prompt()),
         SystemMessage(
             content=(
-                "Use the following knowledge base context to answer the user. "
-                "If the context does not contain the answer, ask one concise follow-up question or say you do not know."
+                "Use the following AGTAALY knowledge base context to answer the user. "
+                "Answer only from this context. If the context does not contain the answer, "
+                "ask one concise follow-up question or say you do not know."
                 f"\n\nContext:\n{context_text}"
             )
         ),
         HumanMessage(content=question),
     ]
-    try:
-        response = llm.invoke(messages)
-        return getattr(response, "content", str(response)).strip()
-    except Exception:
-        return _simple_context_answer(question, documents)
+    response = create_agent().invoke(messages)
+    return getattr(response, "content", str(response)).strip()

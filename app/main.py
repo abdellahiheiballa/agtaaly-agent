@@ -95,11 +95,7 @@ def is_duplicate(message_id: str) -> bool:
 @app.on_event("startup")
 async def startup_event() -> None:
     if not has_documents():
-        try:
-            ingest_knowledge()
-        except Exception as exc:
-            # Do not fail startup on missing OpenAI config or ingestion issues.
-            _log_error("Unable to ingest knowledge at startup", exc)
+        ingest_knowledge()
 
 
 @app.get("/health")
@@ -112,7 +108,8 @@ async def status() -> JSONResponse:
     return JSONResponse(
         {
             "has_documents": has_documents(),
-            "mock_ingest": settings.mock_ingest,
+            "embedding_provider": settings.embedding_provider,
+            "llm_provider": settings.llm_provider,
             "mock_whatsapp_send": settings.mock_whatsapp_send,
             "current_time": _now_iso(),
         }
@@ -155,23 +152,16 @@ async def _handle_incoming_message(event: dict) -> None:
     except WhatsAppSendError as exc:
         _log_error("Failed to send WhatsApp message", exc)
     except Exception as exc:
-        # If answering fails (OpenAI quota, ingestion error, etc.), send a
-        # short fallback message so the sender can verify connectivity.
         _log_error("Failed to process WhatsApp message", exc)
-        try:
-            fallback_message = (
-                "AGTAALY agent is temporarily unavailable. We received your message and will reply when ready."
-            )
-            await send_text_message(event["phone_number"], fallback_message)
-            _log_out(event["phone_number"], fallback_message)
-        except Exception as send_exc:
-            _log_error("Also failed to send fallback message", send_exc)
 
 
 @app.post("/ingest")
 async def trigger_ingest() -> JSONResponse:
     ingest_knowledge()
     return JSONResponse(
-        {"status": "ingested", "mock_ingest": settings.mock_ingest},
+        {
+            "status": "ingested",
+            "embedding_provider": settings.embedding_provider,
+        },
         status_code=200,
     )

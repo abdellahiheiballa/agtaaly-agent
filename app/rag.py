@@ -1,49 +1,98 @@
 from pathlib import Path
-import hashlib
-import math
 import re
 from typing import Dict, Iterable, List
 
 import chromadb
+from langchain_openai.embeddings import OpenAIEmbeddings
+from sentence_transformers import SentenceTransformer
 
 from app.config import settings
 
 
-class LocalEmbeddingFunction:
-    def __init__(self, dimension: int):
-        self.dimension = dimension
+class ProviderConfigError(RuntimeError):
+    pass
 
-    def _tokens(self, text: str) -> List[str]:
-        return re.findall(r"[A-Za-z0-9_À-ÿ\u0600-\u06FF]+", text.lower())
 
-    def _embedding(self, text: str) -> List[float]:
-        vector = [0.0] * self.dimension
-        tokens = self._tokens(text)
-        if not tokens:
-            return vector
+class SentenceTransformerEmbeddingFunction:
+    def __init__(self, model_name: str):
+        self.model_name = model_name
+        self.model = SentenceTransformer(model_name)
 
-        for token in tokens:
-            digest = hashlib.sha256(token.encode("utf-8")).digest()
-            index = int.from_bytes(digest[:8], "big") % self.dimension
-            vector[index] += 1.0
-
-        norm = math.sqrt(sum(value * value for value in vector))
-        if norm:
-            vector = [value / norm for value in vector]
-        return vector
+    def _embed(self, texts: List[str]) -> List[List[float]]:
+        embeddings = self.model.encode(
+            texts,
+            normalize_embeddings=True,
+            show_progress_bar=False,
+        )
+        return [embedding.tolist() for embedding in embeddings]
 
     def embed_documents(self, documents, **_kwargs):
-        return [self._embedding(document) for document in documents]
+        return self._embed([str(document) for document in documents])
 
     def embed_query(self, query=None, **kwargs):
         if query is None and "input" in kwargs:
             query = kwargs.get("input")
         if isinstance(query, (list, tuple)):
-            return [self._embedding(item) for item in query]
-        return self._embedding(query or "")
+            return self._embed([str(item) for item in query])
+        return self._embed([str(query or "")])[0]
 
     def __call__(self, input):
-        return [self._embedding(item) for item in input]
+        return self._embed([str(item) for item in input])
+
+
+class OpenAIEmbeddingFunction:
+    def __init__(self):
+        if not settings.openai_api_key:
+            raise ProviderConfigError(
+                "OPENAI_API_KEY is required when EMBEDDING_PROVIDER=openai."
+            )
+        self.embeddings = OpenAIEmbeddings(
+            model=settings.openai_embedding_model,
+            api_key=settings.openai_api_key,
+        )
+
+    def embed_documents(self, documents, **_kwargs):
+        return [list(item) for item in self.embeddings.embed_documents(list(documents))]
+
+    def embed_query(self, query=None, **kwargs):
+        if query is None and "input" in kwargs:
+            query = kwargs.get("input")
+        if isinstance(query, (list, tuple)):
+            return [list(item) for item in self.embeddings.embed_documents(list(query))]
+        return list(self.embeddings.embed_query(query or ""))
+
+    def __call__(self, input):
+        return [list(item) for item in self.embeddings.embed_documents(list(input))]
+
+
+def _normalized_provider(value: str, allowed: set[str], env_name: str) -> str:
+    normalized = value.strip().lower()
+    if normalized not in allowed:
+        allowed_values = ", ".join(sorted(allowed))
+        raise ProviderConfigError(f"{env_name} must be one of: {allowed_values}.")
+    return normalized
+
+
+def _embedding_provider() -> str:
+    return _normalized_provider(
+        settings.embedding_provider,
+        {"bge-m3", "openai"},
+        "EMBEDDING_PROVIDER",
+    )
+
+
+def _collection_name() -> str:
+    provider = re.sub(r"[^a-z0-9_]+", "_", _embedding_provider().replace("-", "_"))
+    return f"agtaaly_{provider}"
+
+
+def _embedding_function():
+    provider = _embedding_provider()
+    if provider == "bge-m3":
+        return SentenceTransformerEmbeddingFunction(settings.bge_model)
+    if provider == "openai":
+        return OpenAIEmbeddingFunction()
+    raise ProviderConfigError(f"Unsupported embedding provider: {provider}")
 
 
 def _split_text(text: str, chunk_size: int = 800, chunk_overlap: int = 100) -> Iterable[str]:
@@ -65,18 +114,16 @@ def _get_client() -> chromadb.api.ClientAPI:
 
 
 def _get_collection() -> chromadb.api.models.Collection.Collection:
-    client = _get_client()
-    embedding_function = LocalEmbeddingFunction(settings.mock_embedding_dim)
-    return client.create_collection(
-        name="agtaaly",
-        embedding_function=embedding_function,
+    return _get_client().create_collection(
+        name=_collection_name(),
+        embedding_function=_embedding_function(),
         get_or_create=True,
     )
 
 
 def has_documents() -> bool:
     try:
-        collection = _get_client().get_collection(name="agtaaly")
+        collection = _get_client().get_collection(name=_collection_name())
         return collection.count() > 0
     except Exception:
         return False
@@ -85,7 +132,7 @@ def has_documents() -> bool:
 def _reset_collection() -> chromadb.api.models.Collection.Collection:
     client = _get_client()
     try:
-        client.delete_collection(name="agtaaly")
+        client.delete_collection(name=_collection_name())
     except Exception:
         pass
     return _get_collection()
@@ -125,22 +172,20 @@ def ingest_knowledge() -> None:
             "Knowledge base files not found or empty in the knowledge/ directory"
         )
     collection = _reset_collection()
-    add_kwargs = {
-        "ids": [chunk["id"] for chunk in chunks],
-        "documents": [chunk["text"] for chunk in chunks],
-        "metadatas": [chunk["metadata"] for chunk in chunks],
-    }
-    collection.add(**add_kwargs)
+    collection.add(
+        ids=[chunk["id"] for chunk in chunks],
+        documents=[chunk["text"] for chunk in chunks],
+        metadatas=[chunk["metadata"] for chunk in chunks],
+    )
 
 
 def query_knowledge(question: str, k: int | None = None) -> List[Dict[str, object]]:
     collection = _get_collection()
-    query_kwargs = {
-        "n_results": k or settings.top_k_retrieval,
-        "include": ["metadatas", "documents"],
-    }
-    query_kwargs["query_texts"] = [question]
-    result = collection.query(**query_kwargs)
+    result = collection.query(
+        query_texts=[question],
+        n_results=k or settings.top_k_retrieval,
+        include=["metadatas", "documents"],
+    )
     documents = []
     for metadata, document in zip(result["metadatas"][0], result["documents"][0]):
         documents.append({"metadata": metadata or {}, "page_content": document or ""})

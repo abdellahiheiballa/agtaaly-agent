@@ -3,8 +3,8 @@
 ## Architecture
 
 - `app/main.py`: FastAPI service that handles WhatsApp webhook verification, message ingestion, duplicate event filtering, and background replies.
-- `app/config.py`: Settings for OpenAI, WhatsApp Cloud API, and ChromaDB persistence.
-- `app/rag.py`: Loads plaintext knowledge files, creates local deterministic embeddings, and stores/retrieves chunks in ChromaDB.
+- `app/config.py`: Settings for model providers, WhatsApp Cloud API, and ChromaDB persistence.
+- `app/rag.py`: Loads plaintext knowledge files, creates semantic embeddings with BGE-M3 or OpenAI, and stores/retrieves chunks in ChromaDB.
 - `app/agent.py`: Combines the Agtaaly operator instructions, retrieved knowledge chunks, and the user message to answer in a WhatsApp support style.
 - `app/whatsapp.py`: Parses incoming WhatsApp webhook payloads and sends outbound WhatsApp text messages using the WhatsApp Cloud API.
 - `scripts/ingest.py`: A deployable script to create or refresh the local ChromaDB knowledge base.
@@ -24,18 +24,31 @@
 5. Start the API:
    - `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
 
-Knowledge ingestion does not require OpenAI credits. OpenAI is used for the polished chat response; if that call fails, the service still returns a short Agtaaly-style fallback from the retrieved context.
+Default model stack:
 
-### Mock mode
+- `EMBEDDING_PROVIDER=bge-m3`
+- `LLM_PROVIDER=groq`
+- `BGE_MODEL=BAAI/bge-m3`
+- `GROQ_MODEL=llama-3.1-8b-instant`
 
-Set `MOCK_INGEST=true` to skip the OpenAI chat model and return a simple local test reply. Retrieval still uses the local ChromaDB knowledge index.
+To switch back to OpenAI:
 
-Set `MOCK_WHATSAPP_SEND=true` to skip WhatsApp Graph API calls and print outbound messages locally. Use both mock flags together to test that the webhook receives messages and the bot can produce replies without OpenAI or WhatsApp credentials.
+```dotenv
+EMBEDDING_PROVIDER=openai
+LLM_PROVIDER=openai
+OPENAI_MODEL=gpt-4o
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+```
+
+Provider failures are not silently hidden. If BGE-M3, Groq, or OpenAI is misconfigured or unavailable, the service logs a clear error.
+
+### Mock WhatsApp mode
+
+Set `MOCK_WHATSAPP_SEND=true` to skip WhatsApp Graph API calls and print outbound messages locally. This is useful for testing RAG and LLM behavior without sending real WhatsApp messages.
 
 PowerShell:
 
 ```powershell
-$env:MOCK_INGEST = "true"
 $env:MOCK_WHATSAPP_SEND = "true"
 python -m scripts.ingest
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -44,8 +57,6 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 `.env`:
 
 ```dotenv
-MOCK_INGEST=true
-MOCK_EMBEDDING_DIM=1536
 MOCK_WHATSAPP_SEND=true
 ```
 
@@ -70,7 +81,7 @@ Trigger knowledge ingest:
 curl -X POST http://localhost:8000/ingest
 ```
 
-When `MOCK_INGEST=true`, `/ingest` returns `"mock_ingest": true`.
+`/ingest` returns the active embedding provider.
 
 ## WhatsApp Setup
 
