@@ -1,0 +1,13 @@
+AGTAALY Knowledge Base Placeholder
+
+This file is the knowledge base for the AGTAALY WhatsApp assistant.
+Add helpful content here, such as:
+- bus schedules and seat availability
+- ticket booking procedures
+- reservation policies
+- accepted payment methods
+- agency contact details
+- city and route information in Mauritania
+- frequently asked questions for passengers
+
+Each paragraph should be a short, factual statement. The ingestion script will split this content into retrievable chunks.
