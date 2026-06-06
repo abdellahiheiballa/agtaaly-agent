@@ -94,6 +94,9 @@ def is_duplicate(message_id: str) -> bool:
 
 @app.on_event("startup")
 async def startup_event() -> None:
+    if settings.whatsapp_test_mode:
+        print("[INIT] WhatsApp test mode enabled; skipping knowledge ingestion.", flush=True)
+        return
     if not has_documents():
         try:
             ingest_knowledge()
@@ -114,6 +117,10 @@ async def status() -> JSONResponse:
             "has_documents": has_documents(),
             "mock_ingest": settings.mock_ingest,
             "mock_whatsapp_send": settings.mock_whatsapp_send,
+            "whatsapp_test_mode": settings.whatsapp_test_mode,
+            "llm_provider": settings.llm_provider,
+            "embedding_provider": settings.embedding_provider,
+            "groq_model": settings.groq_model,
             "current_time": _now_iso(),
         }
     )
@@ -149,7 +156,10 @@ async def receive_webhook(payload: dict, background_tasks: BackgroundTasks) -> J
 
 async def _handle_incoming_message(event: dict) -> None:
     try:
-        answer = answer_query(event["text"])
+        if settings.whatsapp_test_mode:
+            answer = settings.whatsapp_test_reply
+        else:
+            answer = answer_query(event["text"])
         await send_text_message(event["phone_number"], answer)
         _log_out(event["phone_number"], answer)
     except Exception as exc:

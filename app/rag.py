@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import Dict, Iterable, List
 
 import chromadb
-from langchain_openai.embeddings import OpenAIEmbeddings
 
 from app.config import settings
 
@@ -11,7 +10,7 @@ from app.config import settings
 # function API. Chroma may call `embed_query(input=...)` or `__call__(input=...)`,
 # so the adapter supports both positional and keyword arguments.
 class LangchainEmbeddingAdapter:
-    def __init__(self, lc_embeddings: OpenAIEmbeddings):
+    def __init__(self, lc_embeddings):
         self.lc = lc_embeddings
 
     def embed_documents(self, documents, **_kwargs):
@@ -79,7 +78,14 @@ def _get_collection() -> chromadb.api.models.Collection.Collection:
     if settings.mock_ingest:
         embedding_function = MockEmbeddingFunction(settings.mock_embedding_dim)
     else:
-        embeddings = OpenAIEmbeddings(model=settings.openai_embedding_model)
+        if settings.embedding_provider == "bge-m3":
+            from langchain_huggingface.embeddings import HuggingFaceEmbeddings
+
+            embeddings = HuggingFaceEmbeddings(model_name=settings.bge_model)
+        else:
+            from langchain_openai.embeddings import OpenAIEmbeddings
+
+            embeddings = OpenAIEmbeddings(model=settings.openai_embedding_model)
         embedding_function = LangchainEmbeddingAdapter(embeddings)
     return client.create_collection(
         name="agtaaly",
@@ -116,6 +122,29 @@ def load_knowledge_chunks() -> List[Dict[str, object]]:
     return chunks
 
 
+def _query_knowledge_lexical(question: str, k: int | None = None) -> List[Dict[str, object]]:
+    query_terms = {term.casefold() for term in question.split() if len(term) > 2}
+    chunks = load_knowledge_chunks()
+    if not query_terms:
+        selected = chunks[: k or settings.top_k_retrieval]
+    else:
+        scored = []
+        for chunk in chunks:
+            text = str(chunk["text"])
+            text_folded = text.casefold()
+            score = sum(text_folded.count(term) for term in query_terms)
+            scored.append((score, chunk))
+        scored.sort(key=lambda item: item[0], reverse=True)
+        selected = [chunk for score, chunk in scored if score > 0][: k or settings.top_k_retrieval]
+        if not selected:
+            selected = chunks[: k or settings.top_k_retrieval]
+
+    return [
+        {"metadata": chunk["metadata"], "page_content": str(chunk["text"])}
+        for chunk in selected
+    ]
+
+
 def ingest_knowledge() -> None:
     chunks = load_knowledge_chunks()
     if not chunks:
@@ -140,6 +169,12 @@ def ingest_knowledge() -> None:
 
 
 def query_knowledge(question: str, k: int | None = None) -> List[Dict[str, object]]:
+    if settings.embedding_provider == "bge-m3":
+        try:
+            import langchain_huggingface  # noqa: F401
+        except ImportError:
+            return _query_knowledge_lexical(question, k)
+
     collection = _get_collection()
     query_kwargs = {
         "n_results": k or settings.top_k_retrieval,
