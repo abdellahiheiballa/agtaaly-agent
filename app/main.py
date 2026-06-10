@@ -112,15 +112,16 @@ async def health() -> JSONResponse:
 
 @app.get("/status")
 async def status() -> JSONResponse:
+    from app.rag import _get_collection_name
+
     return JSONResponse(
         {
             "has_documents": has_documents(),
             "mock_ingest": settings.mock_ingest,
             "mock_whatsapp_send": settings.mock_whatsapp_send,
             "whatsapp_test_mode": settings.whatsapp_test_mode,
-            "llm_provider": settings.llm_provider,
-            "embedding_provider": settings.embedding_provider,
-            "groq_model": settings.groq_model,
+            "ai_provider": settings.ai_provider,
+            "collection": _get_collection_name(),
             "current_time": _now_iso(),
         }
     )
@@ -178,8 +179,10 @@ async def _handle_incoming_message(event: dict) -> None:
 
 @app.post("/ingest")
 async def trigger_ingest() -> JSONResponse:
+    from app.rag import _get_collection_name
+
     ingest_knowledge()
     return JSONResponse(
-        {"status": "ingested", "mock_ingest": settings.mock_ingest},
+        {"status": "ingested", "mock_ingest": settings.mock_ingest, "collection": _get_collection_name()},
         status_code=200,
     )

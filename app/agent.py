@@ -1,8 +1,6 @@
-from langchain.chat_models import init_chat_model
-from groq import Groq as GroqClient
-
 from app.config import settings
 from app.rag import query_knowledge
+from app.providers import LLMProvider
 
 
 def _build_prompt(question: str, documents: list) -> str:
@@ -29,14 +27,7 @@ def _build_prompt(question: str, documents: list) -> str:
 
 
 def create_agent():
-    if settings.llm_provider == "groq":
-        return GroqClient(api_key=settings.groq_api_key)
-    else:
-        return init_chat_model(
-            model=settings.openai_model,
-            model_provider="openai",
-            temperature=0.2,
-        )
+    return LLMProvider.create()
 
 
 def answer_query(question: str) -> str:
@@ -47,16 +38,6 @@ def answer_query(question: str) -> str:
             "can send responses. Live AI answers are disabled while MOCK_INGEST=true."
         )
     prompt = _build_prompt(question, documents)
-    
-    if settings.llm_provider == "groq":
-        client = GroqClient(api_key=settings.groq_api_key)
-        completion = client.chat.completions.create(
-            model=settings.groq_model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
-        )
-        return completion.choices[0].message.content.strip()
-    else:
-        llm = create_agent()
-        response = llm.invoke(prompt)
-        return getattr(response, "content", str(response)).strip()
+    llm = LLMProvider.create()
+    response = llm.invoke(prompt)
+    return getattr(response, "content", str(response)).strip()

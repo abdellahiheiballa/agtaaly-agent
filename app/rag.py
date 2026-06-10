@@ -4,9 +4,10 @@ from typing import Dict, Iterable, List
 import chromadb
 
 from app.config import settings
+from app.providers import EmbeddingsProvider
 
 
-# Adapter to make LangChain OpenAIEmbeddings compatible with Chroma's embedding
+# Adapter to make LangChain embeddings compatible with Chroma's embedding
 # function API. Chroma may call `embed_query(input=...)` or `__call__(input=...)`,
 # so the adapter supports both positional and keyword arguments.
 class LangchainEmbeddingAdapter:
@@ -73,22 +74,23 @@ def _get_client() -> chromadb.api.ClientAPI:
     return chromadb.PersistentClient(path=str(settings.chroma_persist_dir))
 
 
+def _get_collection_name() -> str:
+    """Return provider-specific collection name to avoid embedding dimension conflicts."""
+    if settings.mock_ingest:
+        return "agtaaly-mock"
+    if settings.ai_provider == "local":
+        return "agtaaly-local"
+    return "agtaaly"
+
+
 def _get_collection() -> chromadb.api.models.Collection.Collection:
     client = _get_client()
     if settings.mock_ingest:
         embedding_function = MockEmbeddingFunction(settings.mock_embedding_dim)
     else:
-        if settings.embedding_provider == "bge-m3":
-            from langchain_huggingface.embeddings import HuggingFaceEmbeddings
-
-            embeddings = HuggingFaceEmbeddings(model_name=settings.bge_model)
-        else:
-            from langchain_openai.embeddings import OpenAIEmbeddings
-
-            embeddings = OpenAIEmbeddings(model=settings.openai_embedding_model)
-        embedding_function = LangchainEmbeddingAdapter(embeddings)
+        embedding_function = LangchainEmbeddingAdapter(EmbeddingsProvider.create())
     return client.create_collection(
-        name="agtaaly",
+        name=_get_collection_name(),
         embedding_function=embedding_function,
         get_or_create=True,
     )
@@ -96,7 +98,7 @@ def _get_collection() -> chromadb.api.models.Collection.Collection:
 
 def has_documents() -> bool:
     try:
-        collection = _get_client().get_collection(name="agtaaly")
+        collection = _get_client().get_collection(name=_get_collection_name())
         return collection.count() > 0
     except Exception:
         return False
@@ -153,8 +155,6 @@ def ingest_knowledge() -> None:
         )
     collection = _get_collection()
     try:
-        # If the collection is empty, some Chroma versions raise an error
-        # when calling delete() without filters. Ignore that case.
         collection.delete()
     except Exception:
         pass
@@ -166,10 +166,11 @@ def ingest_knowledge() -> None:
     if settings.mock_ingest:
         add_kwargs["embeddings"] = [[0.0] * settings.mock_embedding_dim for _ in chunks]
     collection.add(**add_kwargs)
+    return _get_collection_name()
 
 
 def query_knowledge(question: str, k: int | None = None) -> List[Dict[str, object]]:
-    if settings.embedding_provider == "bge-m3":
+    if settings.ai_provider == "local":
         try:
             import langchain_huggingface  # noqa: F401
         except ImportError:

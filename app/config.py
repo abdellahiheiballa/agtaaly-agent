@@ -12,22 +12,17 @@ class Settings(BaseSettings):
     app_port: int = 8000
     openai_model: str = "gpt-4o"
     openai_embedding_model: str = "text-embedding-3-small"
-    embedding_provider: str = "openai"
     bge_model: str = "BAAI/bge-m3"
-    llm_provider: str = "openai"
-    groq_api_key: str = ""
-    groq_model: str = "llama-3.1-8b-instant"
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "qwen3"
+    ai_provider: str = "openai"
     top_k_retrieval: int = 4
     whatsapp_api_version: str = "v21.0"
     processed_events_db: Path = Path("./data/processed_events.db")
-    # When True, skip calling OpenAI and add mock embeddings to Chroma for testing
     mock_ingest: bool = False
-    # When True, skip WhatsApp Graph API calls and log outbound messages locally
     mock_whatsapp_send: bool = False
-    # When True, WhatsApp webhook replies with a fixed test message and skips RAG/LLM.
     whatsapp_test_mode: bool = False
     whatsapp_test_reply: str = "AGTAALY test reply: WhatsApp connection is working."
-    # Dimension to use for generated mock embeddings when `mock_ingest` is True
     mock_embedding_dim: int = 1536
 
     class Config:

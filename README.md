@@ -26,7 +26,31 @@
 
 If the OpenAI API key is missing at startup, the service will still launch, but knowledge ingestion and response generation will require `OPENAI_API_KEY` to be set.
 
-### Mock ingestion mode
+### AI Provider Configuration
+
+Set `AI_PROVIDER=openai` (default) to use OpenAI embeddings and GPT-4o model, or `AI_PROVIDER=local` to use BGE-M3 embeddings and Ollama Qwen3 for a fully local stack.
+
+```dotenv
+# Use OpenAI (default)
+AI_PROVIDER=openai
+
+# Or use local stack (BGE-M3 + Ollama)
+AI_PROVIDER=local
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen3
+```
+
+When switching providers, the system automatically uses separate ChromaDB collections (`agtaaly-openai` vs `agtaaly-local`) to avoid embedding dimension mismatches. Visit `/status` to see the active collection.
+
+### Local AI Setup
+
+1. Install [Ollama](https://ollama.com)
+2. Pull the Qwen3 model: `ollama pull qwen3`
+3. Start Ollama server: `ollama serve`
+4. Install local dependencies: `pip install langchain-huggingface langchain-ollama`
+5. Ingest knowledge: `python -m scripts.ingest` (uses the local collection)
+
+## Mock ingestion mode
 
 Set `MOCK_INGEST=true` to skip OpenAI embeddings and write zero-vector mock embeddings into ChromaDB. In this mode, incoming WhatsApp messages receive a simple mock reply instead of calling the OpenAI chat model.
 
