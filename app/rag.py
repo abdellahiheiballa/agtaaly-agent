@@ -1,6 +1,6 @@
 from pathlib import Path
 import re
-from typing import Dict, Iterable, List
+from typing import Any, Dict, Iterable, List
 
 import chromadb
 from langchain_openai.embeddings import OpenAIEmbeddings
@@ -13,10 +13,23 @@ class ProviderConfigError(RuntimeError):
     pass
 
 
+class RAGStoreError(RuntimeError):
+    pass
+
+
 class SentenceTransformerEmbeddingFunction:
     def __init__(self, model_name: str):
         self.model_name = model_name
-        self.model = SentenceTransformer(model_name)
+        try:
+            self.model = SentenceTransformer(model_name)
+        except Exception as exc:
+            raise ProviderConfigError(
+                f"Failed to load BGE-M3 embedding model '{model_name}'. "
+                "Install sentence-transformers dependencies and ensure the model is available."
+            ) from exc
+
+    def name(self) -> str:
+        return f"sentence-transformers:{self.model_name}"
 
     def _embed(self, texts: List[str]) -> List[List[float]]:
         embeddings = self.model.encode(
@@ -50,6 +63,9 @@ class OpenAIEmbeddingFunction:
             model=settings.openai_embedding_model,
             api_key=settings.openai_api_key,
         )
+
+    def name(self) -> str:
+        return f"openai:{settings.openai_embedding_model}"
 
     def embed_documents(self, documents, **_kwargs):
         return [list(item) for item in self.embeddings.embed_documents(list(documents))]
@@ -86,6 +102,19 @@ def _collection_name() -> str:
     return f"agtaaly_{provider}"
 
 
+def _collection_exists(client: chromadb.api.ClientAPI, name: str) -> bool:
+    try:
+        collections: list[Any] = client.list_collections()
+    except Exception as exc:
+        raise RAGStoreError(f"Failed to list ChromaDB collections: {exc}") from exc
+
+    for collection in collections:
+        collection_name = getattr(collection, "name", collection)
+        if collection_name == name:
+            return True
+    return False
+
+
 def _embedding_function():
     provider = _embedding_provider()
     if provider == "bge-m3":
@@ -113,7 +142,7 @@ def _get_client() -> chromadb.api.ClientAPI:
     return chromadb.PersistentClient(path=str(settings.chroma_persist_dir))
 
 
-def _get_collection() -> chromadb.api.models.Collection.Collection:
+def _create_or_get_collection() -> chromadb.api.models.Collection.Collection:
     return _get_client().create_collection(
         name=_collection_name(),
         embedding_function=_embedding_function(),
@@ -121,21 +150,43 @@ def _get_collection() -> chromadb.api.models.Collection.Collection:
     )
 
 
-def has_documents() -> bool:
+def _get_existing_collection() -> chromadb.api.models.Collection.Collection:
+    client = _get_client()
+    name = _collection_name()
+    if not _collection_exists(client, name):
+        raise RAGStoreError(
+            f"ChromaDB collection '{name}' does not exist. Run knowledge ingestion first."
+        )
     try:
-        collection = _get_client().get_collection(name=_collection_name())
-        return collection.count() > 0
-    except Exception:
+        return client.get_collection(
+            name=name,
+            embedding_function=_embedding_function(),
+        )
+    except Exception as exc:
+        raise RAGStoreError(f"Failed to open ChromaDB collection '{name}': {exc}") from exc
+
+
+def has_documents() -> bool:
+    client = _get_client()
+    name = _collection_name()
+    if not _collection_exists(client, name):
         return False
+    try:
+        collection = client.get_collection(name=name)
+        return collection.count() > 0
+    except Exception as exc:
+        raise RAGStoreError(f"Failed to inspect ChromaDB collection '{name}': {exc}") from exc
 
 
 def _reset_collection() -> chromadb.api.models.Collection.Collection:
     client = _get_client()
-    try:
-        client.delete_collection(name=_collection_name())
-    except Exception:
-        pass
-    return _get_collection()
+    name = _collection_name()
+    if _collection_exists(client, name):
+        try:
+            client.delete_collection(name=name)
+        except Exception as exc:
+            raise RAGStoreError(f"Failed to reset ChromaDB collection '{name}': {exc}") from exc
+    return _create_or_get_collection()
 
 
 def load_knowledge_chunks() -> List[Dict[str, object]]:
@@ -180,7 +231,7 @@ def ingest_knowledge() -> None:
 
 
 def query_knowledge(question: str, k: int | None = None) -> List[Dict[str, object]]:
-    collection = _get_collection()
+    collection = _get_existing_collection()
     result = collection.query(
         query_texts=[question],
         n_results=k or settings.top_k_retrieval,

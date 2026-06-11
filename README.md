@@ -30,17 +30,19 @@ Default model stack:
 - `LLM_PROVIDER=groq`
 - `BGE_MODEL=BAAI/bge-m3`
 - `GROQ_MODEL=llama-3.1-8b-instant`
+- `GROQ_API_KEY` is required when `LLM_PROVIDER=groq`
 
 To switch back to OpenAI:
 
 ```dotenv
 EMBEDDING_PROVIDER=openai
 LLM_PROVIDER=openai
+OPENAI_API_KEY=...
 OPENAI_MODEL=gpt-4o
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 ```
 
-Provider failures are not silently hidden. If BGE-M3, Groq, or OpenAI is misconfigured or unavailable, the service logs a clear error.
+RAG always uses semantic embeddings from the selected provider. There is no fake, hash, or mock embedding fallback. Provider failures are not silently hidden: if BGE-M3, Groq, OpenAI, or ChromaDB is misconfigured or unavailable, the service raises/logs a clear error.
 
 ### Mock WhatsApp mode
 
