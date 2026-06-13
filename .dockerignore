@@ -1,6 +1,5 @@
 __pycache__
 *.py[cod]
-.env
 chroma_db
 data
 .DS_Store

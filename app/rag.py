@@ -148,12 +148,19 @@ def _query_knowledge_lexical(question: str, k: int | None = None) -> List[Dict[s
 
 
 def ingest_knowledge() -> None:
+    # Only ingest real embeddings when MOCK_INGEST=false.
+    # When MOCK_INGEST=true, we intentionally use zero embeddings.
     chunks = load_knowledge_chunks()
     if not chunks:
         raise FileNotFoundError(
             "Knowledge base files not found or empty in the knowledge/ directory"
         )
+    # Ensure we never accidentally call the embedding provider when local is not selected.
+    if settings.ai_provider != "local":
+        raise RuntimeError("set AI_PROVIDER=local")
+
     collection = _get_collection()
+
     try:
         collection.delete()
     except Exception:

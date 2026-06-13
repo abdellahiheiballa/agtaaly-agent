@@ -1,5 +1,5 @@
 from pathlib import Path
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     ollama_model: str = "qwen3"
     ai_provider: str = "openai"
     top_k_retrieval: int = 4
-    whatsapp_api_version: str = "v21.0"
+    whatsapp_api_version: str = "v22.0"
     processed_events_db: Path = Path("./data/processed_events.db")
     mock_ingest: bool = False
     mock_whatsapp_send: bool = False
@@ -25,9 +25,10 @@ class Settings(BaseSettings):
     whatsapp_test_reply: str = "AGTAALY test reply: WhatsApp connection is working."
     mock_embedding_dim: int = 1536
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+    )
 
 
 settings = Settings()
